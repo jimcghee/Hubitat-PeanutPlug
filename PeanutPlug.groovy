@@ -22,9 +22,10 @@
  *  2018-12-23 - v01.03 merging jamesham change to get the calibrated attr from peanut plug,
  *                      add support for new smartthings app
  *  2019-01-17 - v01.04 merging jamesham retain state code
+ *  2019-05-24 - V02.00 Converted to run on Hubitat.  Modified to display power correctly.
  */
 
-import physicalgraph.zigbee.zcl.DataType
+import hubitat.zigbee.zcl.DataType
 
 metadata {
 	definition (name: "Peanut Plug", namespace: "pakmanwg", author: "pakmanw@sbcglobal.net", ocfDeviceType: "oic.d.switch",
@@ -135,6 +136,12 @@ def parse(String description) {
 				log.debug "Current ${currentValue}"
 				state.current = $currentValue
 				sendEvent(name: "current", value: currentValue)
+			} else if (descMap.attrInt == 0x050B) {
+				def powerValue = String.format("%.4f", (intVal * getPowerMultiplier()))
+//				def powerValue = intVal * getPowerMultiplier()
+				log.debug "Power ${powerValue}"
+				state.powerValue = $powerValue
+				sendEvent(name: "power", value: powerValue)
 			}
 		} else {
 			log.warn "Not an electrical measurement"
@@ -163,11 +170,13 @@ def refresh() {
 	Integer reportIntervalMinutes = 5
 	setRetainState() +
 	zigbee.onOffRefresh() +
-	zigbee.simpleMeteringPowerRefresh() +
+//	zigbee.simpleMeteringPowerRefresh() +
+    zigbee.readAttribute(0x0702, 0x0400) +
 	zigbee.electricMeasurementPowerRefresh() +
 	zigbee.onOffConfig(0, reportIntervalMinutes * 60) +
-	zigbee.simpleMeteringPowerConfig() +
-	zigbee.electricMeasurementPowerConfig() +
+//	zigbee.simpleMeteringPowerConfig() +
+	simpleMeteringPowerConfig() +
+//	zigbee.electricMeasurementPowerConfig() +
 	voltageMeasurementRefresh() +
 	voltageMeasurementConfig() +
 	currentMeasurementRefresh() +
@@ -180,6 +189,10 @@ def refresh() {
 	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0605)
 }
 
+def simpleMeteringPowerConfig(minReportTime=1, maxReportTime=600, reportableChange=0x0030) {
+    zigbee.configureReporting(0x0B04, 0x050B, DataType.INT24, minReportTime, maxReportTime, reportableChange)
+}
+
 def currentMeasurementConfig(minReportTime=1, maxReportTime=600, reportableChange=0x0030) {
 	zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0508, DataType.UINT16, minReportTime, maxReportTime, reportableChange)
 }
@@ -188,7 +201,7 @@ def currentMeasurementRefresh() {
 	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0508);
 }
 
-def voltageMeasurementConfig(minReportTime=1, maxReportTime=600, reportableChange=0x0018) {
+def voltageMeasurementConfig(minReportTime=15, maxReportTime=600, reportableChange=0x0018) {
 	zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0505, DataType.UINT16, minReportTime, maxReportTime, reportableChange)
 }
 
@@ -235,7 +248,7 @@ def updated() {
 	log.debug "in updated()"
 	// updated() doesn't have it's return value processed as hub commands, so we have to send them explicitly
 	def cmds = configureHealthCheck() + setRetainState()
-	cmds.each{ sendHubCommand(new physicalgraph.device.HubAction(it)) }
+	cmds.each{ sendHubCommand(new hubitat.device.HubAction(it)) }
 }
 
 def ping() {
@@ -255,6 +268,7 @@ def setRetainState() {
 }
 
 def reset() {
+	log.debug "Reset"
 	state.energyValue = 0.0
 	state.powerValue = 0.0
 	state.voltage = 0.0
