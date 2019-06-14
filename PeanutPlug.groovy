@@ -23,6 +23,9 @@
  *                      add support for new smartthings app
  *  2019-01-17 - v01.04 merging jamesham retain state code
  *  2019-05-24 - V02.00 Converted to run on Hubitat.  Modified to display power correctly.
+ *  2019-06-14 - V02.50 Added user variables Power Change Report Value, Power Reporting Interval,
+ *                      Current Change Report Value, Current Reporting Interval, Voltage Reporting Interval, and
+ *                      Debug Logging?
  */
 
 import hubitat.zigbee.zcl.DataType
@@ -80,66 +83,176 @@ metadata {
 	}
 
 	preferences {
-		input name: "retainState", type: "bool", title: "Retain State?", description: "Retain state on power loss?", required: false, displayDuringSetup: false, defaultValue: true
+        section {
+		    input (
+                name: "RetainState",
+                type: "bool",
+                title: "Retain State?",
+                description: "Retain state on power loss?", 
+                required: false, 
+                displayDuringSetup: false, 
+                defaultValue: true
+            )
+i/*		    input (
+                name: "PowerReportValueChange",
+                type: "enum",
+                title: "Power Report Value Change",
+                submitOnChange: true,
+                options: ["No Selection","No Report",".1 Watt",".2 Watts",".3 Watts",".4 Watts",".5 Watts",
+                            "1 Watt","2 Watts","3 Watts","4 Watts","5 Watts","10 Watts","25 Watts",
+                            "50 Watts","75 Watts","100 Watts","150 Watts","200 Watts","250 Watts","300 Watts","400 Watts",
+                            "500 Watts","750 Watts","1000 Watts"],
+                required: true,
+                Multiple: false
+            )
+		    input (
+                name: "PowerReportPercentChange",
+                type: "enum",
+                title: "Power Report Percentage Change",
+                submitOnChange: true,
+                options: ["No Selection","No Report","1%","2%","3%","4%","5%","10%","15%","20","25%","30%","40%","50%","75%","100%"],
+                required: true,
+                Multiple: false
+            )
+		    input (
+                name: "PowerReportingInterval",
+                type: "enum",
+                title: "Power Reporting Interval",
+                submitOnChange: true,
+                options: ["No Selection","No Report","5 Seconds","10 Seconds","15 Seconds","30 Seconds","45 Seconds","1 Minute",
+                            "2 Minutes","3 Minutes","4 Minutes","5 Minutes","10 Minutes","15 Minutes","30 Minutes","45 Minutes",
+                            "1 Hour","2 Hours","3 Hours","5 Hours"],
+                required: true,
+                Multiple: false
+            ) */
+		    input (
+                name: "ReportablePowerChange",
+                type: "number",
+                title: "Power Change Report Value",
+                description: "Report Power change greater than XXX watts. (.1 - 1000)",
+                submitOnChange: true,
+                required: true,
+                range: "0..1000",
+                defaultValue: 5
+            )
+		    input (
+                name: "MinPowerReportTime",
+                type: "number",
+                title: "Power Reporting Interval",
+                description: "Report Power no more than every XXX seconds. (1 - 7200)",
+                submitOnChange: true,
+                required: true,
+                range: "1..7200",
+                defaultValue: 60
+            )
+		    input (
+                name: "ReportableCurrentChange",
+                type: "number",
+                title: "Current Change Report Value",
+                description: "Report Current change greater than XXX milliamps. (1 - 1000)",
+                submitOnChange: true,
+                required: true,
+                range: "1..1000",
+                defaultValue: 1
+            )
+		    input (
+                name: "MinCurrentReportTime",
+                type: "number",
+                title: "Current Reporting Interval",
+                description: "Report Current no more than every XXX seconds. (1 - 7200)",
+                submitOnChange: true,
+                required: true,
+                range: "1..7200",
+                defaultValue: 60
+            )
+		    input (
+                name: "MinVoltageReportTime",
+                type: "number",
+                title: "Voltage Reporting Interval",
+                description: "Report Voltage no more than every XXX seconds. (1 - 7200)",
+                submitOnChange: true,
+                required: true,
+                range: "1..7200",
+                defaultValue: 60
+            )
+		    input (
+                name: "DebugLogging",
+                type: "bool",
+                title: "Debug Logging",
+//                description: "Enable Debug Logging", 
+                required: true, 
+                displayDuringSetup: false, 
+                defaultValue: true
+            )
+        }
 	}
 }
 
+def log(msg) {
+	if (DebugLogging) {
+		log.debug(msg)	
+	}
+}
+
+// Parse incoming device messages to generate events
 def parse(String description) {
 
-	log.debug "description is $description"
+//	zigbee.ELECTRICAL_MEASUREMENT_CLUSTER is 2820
+	log "description is: $description"
 	def event = zigbee.getEvent(description)
 	if (event) {
+	    log "event name is $event.name"
 		if (event.name == "power") {
 			def powerValue
 			powerValue = (event.value as Integer) * getPowerMultiplier()
 			sendEvent(name: "power", value: powerValue)
 			def time = (now() - state.time) / 3600000 / 1000
 			state.time = now()
-			log.debug "powerValues is $state.powerValue"
+			log "powerValues is $state.powerValue"
 			state.energyValue = state.energyValue + (time * state.powerValue)
 			state.powerValue = powerValue
-			// log.debug "energyValue is $state.energyValue"
+			// log "energyValue is $state.energyValue"
 			sendEvent(name: "energy", value: state.energyValue)
 		} else {
 			sendEvent(event)
 		}
 	} else if (description?.startsWith("read attr -")) {
 		def descMap = zigbee.parseDescriptionAsMap(description)
-		log.debug "Desc Map: $descMap"
+		log "Desc Map: $descMap"
 		if (descMap.clusterInt == zigbee.ELECTRICAL_MEASUREMENT_CLUSTER) {
 			def intVal = Integer.parseInt(descMap.value,16)
 			if (descMap.attrInt == 0x0600) {
-				log.debug "ACVoltageMultiplier $intVal"
+				log.info "ACVoltageMultiplier $intVal"
 				state.voltageMultiplier = intVal
 			} else if (descMap.attrInt == 0x0601) {
-				log.debug "ACVoltageDivisor $intVal"
+				log.info "ACVoltageDivisor $intVal"
 				state.voltageDivisor = intVal
 			} else if (descMap.attrInt == 0x0602) {
-				log.debug "ACCurrentMultiplier $intVal"
+				log.info "ACCurrentMultiplier $intVal"
 				state.currentMultiplier = intVal
 			} else if (descMap.attrInt == 0x0603) {
-				log.debug "ACCurrentDivisor $intVal"
+				log.info "ACCurrentDivisor $intVal"
 				state.currentDivisor = intVal
 			} else if (descMap.attrInt == 0x0604) {
-				log.debug "ACPowerMultiplier $intVal"
+				log.info "ACPowerMultiplier $intVal"
 				state.powerMultiplier = intVal
 			} else if (descMap.attrInt == 0x0605) {
-				log.debug "ACPowerDivisor $intVal"
+				log.info "ACPowerDivisor $intVal"
 				state.powerDivisor = intVal
 			} else if (descMap.attrInt == 0x0505) {
 				def voltageValue = intVal * getVoltageMultiplier()
-				log.debug "Voltage ${voltageValue}"
+				log "Voltage ${voltageValue}"
 				state.voltage = $voltageValue
 				sendEvent(name: "voltage", value: voltageValue)
 			} else if (descMap.attrInt == 0x0508) {
-				def currentValue = intVal * getCurrentMultiplier()
-				log.debug "Current ${currentValue}"
+				def currentValue = String.format("%.4f", (intVal * getCurrentMultiplier()))
+				log "Current ${currentValue}"
 				state.current = $currentValue
 				sendEvent(name: "current", value: currentValue)
 			} else if (descMap.attrInt == 0x050B) {
 				def powerValue = String.format("%.4f", (intVal * getPowerMultiplier()))
-//				def powerValue = intVal * getPowerMultiplier()
-				log.debug "Power ${powerValue}"
+//				log "Power ${intVal}, ${getPowerMultiplier()}"
+				log "Power ${powerValue}"
 				state.powerValue = $powerValue
 				sendEvent(name: "power", value: powerValue)
 			}
@@ -148,7 +261,7 @@ def parse(String description) {
 		}
 	} else {
 		log.warn "DID NOT PARSE MESSAGE for description : $description"
-		log.debug zigbee.parseDescriptionAsMap(description)
+		log zigbee.parseDescriptionAsMap(description)
 	}
 }
 
@@ -171,12 +284,13 @@ def refresh() {
 	setRetainState() +
 	zigbee.onOffRefresh() +
 //	zigbee.simpleMeteringPowerRefresh() +
-    zigbee.readAttribute(0x0702, 0x0400) +
+//	simpleMeteringPowerRefresh() +
 	zigbee.electricMeasurementPowerRefresh() +
 	zigbee.onOffConfig(0, reportIntervalMinutes * 60) +
 //	zigbee.simpleMeteringPowerConfig() +
-	simpleMeteringPowerConfig() +
+//	simpleMeteringPowerConfig() +
 //	zigbee.electricMeasurementPowerConfig() +
+	electricMeasurementPowerConfig() +
 	voltageMeasurementRefresh() +
 	voltageMeasurementConfig() +
 	currentMeasurementRefresh() +
@@ -189,20 +303,49 @@ def refresh() {
 	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0605)
 }
 
-def simpleMeteringPowerConfig(minReportTime=1, maxReportTime=600, reportableChange=0x0030) {
-    zigbee.configureReporting(0x0B04, 0x050B, DataType.INT24, minReportTime, maxReportTime, reportableChange)
+//def electricMeasurementPowerConfig(
+//                                minReportTime=10,           // in seconds
+//                                maxReportTime=600,          // in seconds
+//                                reportableChange=0x0005)    // in .1 Watts 
+def electricMeasurementPowerConfig()    // in .1 Watts 
+{
+    def MinPowerValueA
+    MinPowerValue = (((ReportablePowerChange as float) * 10) as Integer)
+	log.info "Power Report Time: $MinPowerReportTime, Power Report Value: $MinPowerValue"
+	zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 
+                            0x050B, 
+                            DataType.INT16, 
+                            MinPowerReportTime as Integer,              // Min Power reporting time in seconds
+                            7200,                                       // Max Power reporting time in seconds
+                            MinPowerValue as Integer)                   // Min Reportable Power Change in Tenths of Watts
 }
 
-def currentMeasurementConfig(minReportTime=1, maxReportTime=600, reportableChange=0x0030) {
-	zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0508, DataType.UINT16, minReportTime, maxReportTime, reportableChange)
+//def currentMeasurementConfig(minReportTime=60, maxReportTime=600, reportableChange=0x0005) {
+//	zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0508, DataType.UINT16, minReportTime, maxReportTime, reportableChange)
+//}
+
+def currentMeasurementConfig() {
+	log.info "Current Report Time: $MinCurrentReportTime, Current Report Value: $ReportableCurrentChange"
+	zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 
+                            0x0508, 
+                            DataType.INT16, 
+                            MinCurrentReportTime as Integer,    // Min Current reporting time in seconds
+                            7200,                               // Max Current reporting time in seconds
+                            ReportableCurrentChange as Integer) // Min Reportable Current Change in Tenths of Watts
 }
 
 def currentMeasurementRefresh() {
 	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0508);
 }
 
-def voltageMeasurementConfig(minReportTime=15, maxReportTime=600, reportableChange=0x0018) {
-	zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0505, DataType.UINT16, minReportTime, maxReportTime, reportableChange)
+def voltageMeasurementConfig() {
+	log.info "Voltage Report Time: $MinVoltageReportTime"
+	zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 
+                            0x0505, 
+                            DataType.INT16, 
+                            MinVoltageReportTime as Integer,    // Min Voltage reporting time in seconds
+                            7200,                               // Max Voltage reporting time in seconds
+                            0x0030)                             // Min Reportable Voltage Change in Tenths of Volts
 }
 
 def voltageMeasurementRefresh() {
@@ -234,7 +377,7 @@ def getPowerMultiplier() {
 }
 
 def configure() {
-	log.debug "in configure()"
+	log "in configure()"
 	return configureHealthCheck() + setRetainState()
 }
 
@@ -245,7 +388,8 @@ def configureHealthCheck() {
 }
 
 def updated() {
-	log.debug "in updated()"
+    log.info "${device.displayName}.updated()"
+	log "in updated()"
 	// updated() doesn't have it's return value processed as hub commands, so we have to send them explicitly
 	def cmds = configureHealthCheck() + setRetainState()
 	cmds.each{ sendHubCommand(new hubitat.device.HubAction(it)) }
@@ -256,10 +400,10 @@ def ping() {
 }
 
 def setRetainState() {
-	log.debug "Setting Retain State: $retainState"
-	if (retainState == null || retainState) {
-		if (retainState == null) {
-			log.warn "retainState is null, defaulting to 'true' behavior"
+	log "Setting Retain State: $RetainState"
+	if (RetainState == null || RetainState) {
+		if (RetainState == null) {
+			log.warn "RetainState is null, defaulting to 'true' behavior"
 		}
 		return zigbee.writeAttribute(0x0003, 0x0000, DataType.UINT16, 0x0000)
 	} else {
@@ -268,7 +412,7 @@ def setRetainState() {
 }
 
 def reset() {
-	log.debug "Reset"
+	log "Reset"
 	state.energyValue = 0.0
 	state.powerValue = 0.0
 	state.voltage = 0.0
