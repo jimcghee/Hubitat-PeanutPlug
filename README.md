@@ -42,7 +42,7 @@ SET UP DISCOVERED PLUGS
    If your plug does not report power/voltage/current it probably needs a firmware update. 
 2. Exclude the plug from the Almond router.
 3. Discover/Include the plug on your Hubitat as a ZigBee device in the normal way.  If it fails to include, you might try to reset it:  
-        a. Reset the Plug by pressing the pairing button ( ) for 10 seconds and then releasing it.  
+        a. Reset the Plug by pressing the pairing button (button with wifi symbol) for 10 seconds and then releasing it.  
         b. Remove the Plug from the power outlet and plug it back in  
 4. Name the plug and click 'Save'.
 5. Go to the 'Devices' list, find your new device and open it.
