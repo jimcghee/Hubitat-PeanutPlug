@@ -26,23 +26,22 @@
  *  2019-06-14 - V02.50 Added user variables Power Change Report Value, Power Reporting Interval,
  *                      Current Change Report Value, Current Reporting Interval, Voltage Reporting Interval, and
  *                      Debug Logging?
+ *  2019-06-25 - V02.60 Removed deprecated ST functions and tiles.  Enabled Energy reporting (in W*h). *
  */
 
 import hubitat.zigbee.zcl.DataType
 
-metadata {
+metadata
+{
 	definition (name: "Peanut Plug", namespace: "pakmanwg", author: "pakmanw@sbcglobal.net", ocfDeviceType: "oic.d.switch",
-		vid: "generic-switch-power-energy") {
-		capability "Energy Meter"
-		capability "Actuator"
-		capability "Switch"
-		capability "Power Meter"
-		capability "Polling"
-		capability "Refresh"
+		vid: "generic-switch-power-energy") 
+    {
 		capability "Configuration"
-		capability "Sensor"
-		capability "Light"
-		capability "Health Check"
+        capability "Energy Meter"
+        capability "Polling"
+        capability "Power Meter"
+        capability "Refresh"
+		capability "Switch"		
 		capability "Voltage Measurement"
         
 		attribute "current","number"
@@ -50,91 +49,23 @@ metadata {
 		command "reset"
        
 		fingerprint profileId: "0104", inClusters: "0000, 0001, 0003, 0004, 0005, 0006, 0B04, 0B05",
-			outClusters: "0000, 0001, 0003, 0004, 0005, 0006, 0019, 0B04, 0B05"
-	}
+			        outClusters: "0000, 0001, 0003, 0004, 0005, 0006, 0019, 0B04, 0B05"
+    }
 
-	// tile definitions
-	tiles {
-		standardTile("switch", "device.switch", width: 2, height: 2, canChangeIcon: true) {
-			state "on", label: '${name}', action: "switch.off", icon: "st.switches.switch.on", backgroundColor: "#00A0DC"
-			state "off", label: '${name}', action: "switch.on", icon: "st.switches.switch.off", backgroundColor: "#ffffff"
-		}
-		valueTile("power", "device.power") {
-			state "default", label:'${currentValue} W'
-		}
-		valueTile("energy", "device.energy") {
-			state "default", label:'${currentValue} kWh'
-		}
-		valueTile("voltage", "device.voltage") {
-			state "default", label:'${currentValue} V'
-		}
-		valueTile("current", "device.current") {
-			state "default", label:'${currentValue} A'
-		}
-		standardTile("reset", "device.energy", inactiveLabel: false, decoration: "flat") {
-			state "default", label:'reset kWh', action:"reset"
-		}
-		standardTile("refresh", "device.power", inactiveLabel: false, decoration: "flat") {
-			state "default", label:'', action:"refresh.refresh", icon:"st.secondary.refresh"
-		}
-
-		main(["switch","power","energy","voltage","current"])
-		details(["switch","power","energy","voltage","current","refresh","reset"])
-	}
-
-	preferences {
-        section {
+	preferences 
+    {
+        section 
+        {
 		    input (
                 name: "RetainState",
                 type: "bool",
                 title: "Retain State?",
-                description: "Retain state on power loss?", 
+                description: "Retain switch state on power loss?", 
                 required: false, 
                 displayDuringSetup: false, 
                 defaultValue: true
             )
-i/*		    input (
-                name: "PowerReportValueChange",
-                type: "enum",
-                title: "Power Report Value Change",
-                submitOnChange: true,
-                options: ["No Selection","No Report",".1 Watt",".2 Watts",".3 Watts",".4 Watts",".5 Watts",
-                            "1 Watt","2 Watts","3 Watts","4 Watts","5 Watts","10 Watts","25 Watts",
-                            "50 Watts","75 Watts","100 Watts","150 Watts","200 Watts","250 Watts","300 Watts","400 Watts",
-                            "500 Watts","750 Watts","1000 Watts"],
-                required: true,
-                Multiple: false
-            )
-		    input (
-                name: "PowerReportPercentChange",
-                type: "enum",
-                title: "Power Report Percentage Change",
-                submitOnChange: true,
-                options: ["No Selection","No Report","1%","2%","3%","4%","5%","10%","15%","20","25%","30%","40%","50%","75%","100%"],
-                required: true,
-                Multiple: false
-            )
-		    input (
-                name: "PowerReportingInterval",
-                type: "enum",
-                title: "Power Reporting Interval",
-                submitOnChange: true,
-                options: ["No Selection","No Report","5 Seconds","10 Seconds","15 Seconds","30 Seconds","45 Seconds","1 Minute",
-                            "2 Minutes","3 Minutes","4 Minutes","5 Minutes","10 Minutes","15 Minutes","30 Minutes","45 Minutes",
-                            "1 Hour","2 Hours","3 Hours","5 Hours"],
-                required: true,
-                Multiple: false
-            ) */
-		    input (
-                name: "ReportablePowerChange",
-                type: "number",
-                title: "Power Change Report Value",
-                description: "Report Power change greater than XXX watts. (.1 - 1000)",
-                submitOnChange: true,
-                required: true,
-                range: "0..1000",
-                defaultValue: 5
-            )
+
 		    input (
                 name: "MinPowerReportTime",
                 type: "number",
@@ -143,18 +74,20 @@ i/*		    input (
                 submitOnChange: true,
                 required: true,
                 range: "1..7200",
-                defaultValue: 60
+                defaultValue: 5
             )
-		    input (
-                name: "ReportableCurrentChange",
+            
+            input (
+                name: "ReportablePowerChange",
                 type: "number",
-                title: "Current Change Report Value",
-                description: "Report Current change greater than XXX milliamps. (1 - 1000)",
+                title: "Minimum Power Change Report Value",
+                description: "Report Power change greater than XXX watts. (0 - 1000)",
                 submitOnChange: true,
                 required: true,
-                range: "1..1000",
+                range: "0..1000",
                 defaultValue: 1
             )
+          
 		    input (
                 name: "MinCurrentReportTime",
                 type: "number",
@@ -163,8 +96,20 @@ i/*		    input (
                 submitOnChange: true,
                 required: true,
                 range: "1..7200",
-                defaultValue: 60
+                defaultValue: 5
             )
+            
+            input (
+                name: "ReportableCurrentChange",
+                type: "number",
+                title: "Minimum Current Change Report Value",
+                description: "Report Power change greater than XXX amps. (0 - 1000)",
+                submitOnChange: true,
+                required: true,
+                range: "0..1000",
+                defaultValue: 1
+            )
+            
 		    input (
                 name: "MinVoltageReportTime",
                 type: "number",
@@ -173,13 +118,25 @@ i/*		    input (
                 submitOnChange: true,
                 required: true,
                 range: "1..7200",
-                defaultValue: 60
+                defaultValue: 5
             )
+            
+            input (
+                name: "ReportableVoltageChange",
+                type: "number",
+                title: "Minimum Voltage Change Report Value",
+                description: "Report Power change greater than XXX volts. (0 - 1000)",
+                submitOnChange: true,
+                required: true,
+                range: "0..1000",
+                defaultValue: 1
+            )
+            
 		    input (
                 name: "DebugLogging",
                 type: "bool",
                 title: "Debug Logging",
-//                description: "Enable Debug Logging", 
+                description: "Enable Debug Logging?", 
                 required: true, 
                 displayDuringSetup: false, 
                 defaultValue: true
@@ -188,114 +145,163 @@ i/*		    input (
 	}
 }
 
-def log(msg) {
-	if (DebugLogging) {
+def log(msg) 
+{
+	if (DebugLogging)
+    {
 		log.debug(msg)	
 	}
 }
 
 // Parse incoming device messages to generate events
-def parse(String description) {
-
-//	zigbee.ELECTRICAL_MEASUREMENT_CLUSTER is 2820
+def parse(String description) 
+{
+    //	zigbee.ELECTRICAL_MEASUREMENT_CLUSTER is 0x0B04
 	log "description is: $description"
 	def event = zigbee.getEvent(description)
-	if (event) {
+	if (event) 
+    {
 	    log "event name is $event.name"
-		if (event.name == "power") {
-			def powerValue
-			powerValue = (event.value as Integer) * getPowerMultiplier()
-			sendEvent(name: "power", value: powerValue)
-			def time = (now() - state.time) / 3600000 / 1000
-			state.time = now()
-			log "powerValues is $state.powerValue"
-			state.energyValue = state.energyValue + (time * state.powerValue)
-			state.powerValue = powerValue
-			// log "energyValue is $state.energyValue"
-			sendEvent(name: "energy", value: state.energyValue)
-		} else {
-			sendEvent(event)
-		}
-	} else if (description?.startsWith("read attr -")) {
+       	sendEvent(event)
+	}
+    else if (description?.startsWith("read attr -")) 
+    {
 		def descMap = zigbee.parseDescriptionAsMap(description)
 		log "Desc Map: $descMap"
-		if (descMap.clusterInt == zigbee.ELECTRICAL_MEASUREMENT_CLUSTER) {
+		if (descMap.clusterInt == zigbee.ELECTRICAL_MEASUREMENT_CLUSTER)
+        {
 			def intVal = Integer.parseInt(descMap.value,16)
-			if (descMap.attrInt == 0x0600) {
-				log.info "ACVoltageMultiplier $intVal"
-				state.voltageMultiplier = intVal
-			} else if (descMap.attrInt == 0x0601) {
-				log.info "ACVoltageDivisor $intVal"
-				state.voltageDivisor = intVal
-			} else if (descMap.attrInt == 0x0602) {
-				log.info "ACCurrentMultiplier $intVal"
-				state.currentMultiplier = intVal
-			} else if (descMap.attrInt == 0x0603) {
-				log.info "ACCurrentDivisor $intVal"
-				state.currentDivisor = intVal
-			} else if (descMap.attrInt == 0x0604) {
-				log.info "ACPowerMultiplier $intVal"
-				state.powerMultiplier = intVal
-			} else if (descMap.attrInt == 0x0605) {
-				log.info "ACPowerDivisor $intVal"
-				state.powerDivisor = intVal
-			} else if (descMap.attrInt == 0x0505) {
-				def voltageValue = intVal * getVoltageMultiplier()
-				log "Voltage ${voltageValue}"
-				state.voltage = $voltageValue
-				sendEvent(name: "voltage", value: voltageValue)
-			} else if (descMap.attrInt == 0x0508) {
-				def currentValue = String.format("%.4f", (intVal * getCurrentMultiplier()))
-				log "Current ${currentValue}"
-				state.current = $currentValue
-				sendEvent(name: "current", value: currentValue)
-			} else if (descMap.attrInt == 0x050B) {
-				def powerValue = String.format("%.4f", (intVal * getPowerMultiplier()))
-//				log "Power ${intVal}, ${getPowerMultiplier()}"
-				log "Power ${powerValue}"
-				state.powerValue = $powerValue
-				sendEvent(name: "power", value: powerValue)
-			}
-		} else {
+            
+            /*
+            http://www.zigbee.org/wp-content/uploads/2014/10/07-5123-06-zigbee-cluster-library-specification.pdf
+
+            Id     Name             Type     Range         Acc   Default M/O
+            0x0505 RMSVoltage       uint16 0x0000 – 0xFFFF R     0xFFFF O
+            0x0506 RMSVoltageMin    uint16 0x0000 – 0xFFFF R     0xFFFF O
+            0x0507 RMSVoltageMax    uint16 0x0000 – 0xFFFF R     0xFFFF O
+            0x0508 RMSCurrent       uint16 0x0000 – 0xFFFF R     0xFFFF O
+            0x0509 RMSCurrentMin    uint16 0x0000 – 0xFFFF R     0xFFFF O
+            0x050A RMSCurrentMax    uint16 0x0000 – 0xFFFF R     0xFFFF O
+            0x050B ActivePower      int16 -32768 – 32767   R     0x8000 O
+
+            Id     Name                 Type     Range           Acc   Default M/O
+            0x0600 ACVoltageMultiplier  uint16   0x0001 – 0xFFFF R     0x0001 O
+            0x0601 ACVoltageDivisor     uint16   0x0001 – 0xFFFF R     0x0001 O
+            0x0602 ACCurrentMultiplier  uint16   0x0001 – 0xFFFF R     0x0001 O
+            0x0603 ACCurrentDivisor     uint16   0x0001 – 0xFFFF R     0x0001 O
+            0x0604 ACPowerMultiplier    uint16   0x0001 – 0xFFFF R     0x0001 O
+            0x0605 ACPowerDivisor       uint16   0x0001 – 0xFFFF R     0x0001 O
+            */
+                                          
+            switch(descMap.attrInt)
+            {
+                case 0x0600:
+                    log.info "ACVoltageMultiplier $intVal"
+				    state.voltageMultiplier = intVal
+                    break
+                case 0x0601:
+				    log.info "ACVoltageDivisor $intVal"
+				    state.voltageDivisor = intVal
+                    break
+                case 0x0602:
+                	log.info "ACCurrentMultiplier $intVal"
+				    state.currentMultiplier = intVal
+                    break
+                case 0x0603:
+                    log.info "ACCurrentDivisor $intVal"
+				    state.currentDivisor = intVal
+                    break
+                case 0x0604:
+                    log.info "ACPowerMultiplier $intVal"
+				    state.powerMultiplier = intVal
+                    break
+                case 0x0605:
+                    log.info "ACPowerDivisor $intVal"
+				    state.powerDivisor = intVal
+                    break
+                case 0x0505:
+                    def voltageValue = intVal * getVoltageMultiplier()
+                    log "Raw Voltage: ${intVal}"
+                    log "Voltage Multiplier: ${getVoltageMultiplier()}"
+                    log "RMS Voltage: ${voltageValue}"
+				    state.voltage = voltageValue
+				    sendEvent(name: "voltage", value: voltageValue)
+                    break
+                case 0x0508:
+                    def currentValue = intVal * getCurrentMultiplier()
+                    log "Raw Current: ${intVal}"
+                    log "Current Multiplier: ${getCurrentMultiplier()}"
+                    log "RMS Current: ${currentValue}"
+				    state.current = currentValue
+				    sendEvent(name: "current", value: currentValue)
+                    break
+                case 0x050B:
+                    // first, calculate and update power
+                    def powerValue = intVal * getPowerMultiplier()
+                    log "Raw Power: ${intVal}"
+                    log "Power Multiplier: ${getPowerMultiplier()}"
+                    log "Power: ${powerValue}"				    
+				    sendEvent(name: "power", value: powerValue)                
+                    // then, calculate and update energy (in W*h)
+                    def newTime = now()
+                    // note that time is Unix epoch in msec, so this converts the difference to seconds and then hours
+                    def energyValue = state.energyValue + (newTime - state.time) * state.powerValue / (1000*3600)
+                    log "Energy: ${energyValue} W*h"
+                    sendEvent(name: "energy", value: energyValue)
+                
+                    // finally, update state
+                    state.powerValue = powerValue
+                    state.energyValue = energyValue
+                    state.time = newTime
+                    break
+                default:
+                    log "Unknown ELECTRICAL_MEASUREMENT_CLUSTER entry ${descMap.attrInt}"
+            }
+		}
+        else
+        {
 			log.warn "Not an electrical measurement"
 		}
-	} else {
+        
+	} 
+    else 
+    {
 		log.warn "DID NOT PARSE MESSAGE for description : $description"
 		log zigbee.parseDescriptionAsMap(description)
 	}
 }
 
-def installed() {
+def installed()
+{
 	reset()
 	configure()
 	refresh()
 }
 
-def off() {
+def off()
+{
 	zigbee.off()
 }
 
-def on() {
+def on()
+{
 	zigbee.on()
 }
 
-def refresh() {
+def refresh()
+{
+    //log "in Peanut Plug refresh()"
 	Integer reportIntervalMinutes = 5
 	setRetainState() +
 	zigbee.onOffRefresh() +
-//	zigbee.simpleMeteringPowerRefresh() +
-//	simpleMeteringPowerRefresh() +
 	zigbee.electricMeasurementPowerRefresh() +
 	zigbee.onOffConfig(0, reportIntervalMinutes * 60) +
-//	zigbee.simpleMeteringPowerConfig() +
-//	simpleMeteringPowerConfig() +
-//	zigbee.electricMeasurementPowerConfig() +
 	electricMeasurementPowerConfig() +
 	voltageMeasurementRefresh() +
 	voltageMeasurementConfig() +
 	currentMeasurementRefresh() +
 	currentMeasurementConfig() +
-	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0600) +
+    zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0600) +
 	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0601) +
 	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0602) +
 	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0603) +
@@ -303,120 +309,147 @@ def refresh() {
 	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0605)
 }
 
-//def electricMeasurementPowerConfig(
-//                                minReportTime=10,           // in seconds
-//                                maxReportTime=600,          // in seconds
-//                                reportableChange=0x0005)    // in .1 Watts 
-def electricMeasurementPowerConfig()    // in .1 Watts 
+def voltageMeasurementConfig()
 {
-    def MinPowerValueA
-    MinPowerValue = (((ReportablePowerChange as float) * 10) as Integer)
-	log.info "Power Report Time: $MinPowerReportTime, Power Report Value: $MinPowerValue"
+    log.info "Voltage Report Time: ${MinVoltageReportTime}"
+	zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 
+                            0x0505, 
+                            DataType.UINT16, 
+                            MinVoltageReportTime as Integer,    // Min Voltage reporting time in seconds
+                            7200,                               // Max Voltage reporting time in seconds
+                            ReportableVoltageChange as Integer) // Min change to report.  Units unknown.
+}
+
+def voltageMeasurementRefresh()
+{
+	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0505);
+}
+
+def currentMeasurementConfig()
+{
+    log.info "Current Report Time: ${MinCurrentReportTime}"
+    zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 
+                            0x0508, 
+                            DataType.UINT16, 
+                            MinCurrentReportTime as Integer,    // Min Current reporting time in seconds
+                            7200,                               // Max Current reporting time in seconds
+                            ReportableCurrentChange as Integer) // Min change to report.  Units unknown.
+}
+
+def currentMeasurementRefresh()
+{
+    zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0508);
+}
+
+def electricMeasurementPowerConfig()
+{
+    log.info "Power Report Time: ${MinPowerReportTime}"
 	zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 
                             0x050B, 
                             DataType.INT16, 
                             MinPowerReportTime as Integer,              // Min Power reporting time in seconds
                             7200,                                       // Max Power reporting time in seconds
-                            MinPowerValue as Integer)                   // Min Reportable Power Change in Tenths of Watts
+                            ReportablePowerChange as Integer)           // Min change to report.  Units unknown.
 }
 
-//def currentMeasurementConfig(minReportTime=60, maxReportTime=600, reportableChange=0x0005) {
-//	zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0508, DataType.UINT16, minReportTime, maxReportTime, reportableChange)
-//}
 
-def currentMeasurementConfig() {
-	log.info "Current Report Time: $MinCurrentReportTime, Current Report Value: $ReportableCurrentChange"
-	zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 
-                            0x0508, 
-                            DataType.INT16, 
-                            MinCurrentReportTime as Integer,    // Min Current reporting time in seconds
-                            7200,                               // Max Current reporting time in seconds
-                            ReportableCurrentChange as Integer) // Min Reportable Current Change in Tenths of Watts
-}
-
-def currentMeasurementRefresh() {
-	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0508);
-}
-
-def voltageMeasurementConfig() {
-	log.info "Voltage Report Time: $MinVoltageReportTime"
-	zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 
-                            0x0505, 
-                            DataType.INT16, 
-                            MinVoltageReportTime as Integer,    // Min Voltage reporting time in seconds
-                            7200,                               // Max Voltage reporting time in seconds
-                            0x0030)                             // Min Reportable Voltage Change in Tenths of Volts
-}
-
-def voltageMeasurementRefresh() {
-	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0505);
-}
-
-def getCurrentMultiplier() {
-	if (state.currentMultiplier && state.currentDivisor) {
+def getCurrentMultiplier() 
+{
+	if (state.currentMultiplier && state.currentDivisor) 
+    {
 		return (state.currentMultiplier / state.currentDivisor)
-	} else {
+	} 
+    else
+    {
+        // typical value
 		return 0.001831
 	}
 }
 
-def getVoltageMultiplier() {
-	if (state.voltageMultiplier && state.voltageDivisor) {
+def getVoltageMultiplier() 
+{
+	if (state.voltageMultiplier && state.voltageDivisor)
+    {
 		return (state.voltageMultiplier / state.voltageDivisor)
-	} else {
+	}
+    else
+    {
+        // typical value
 		return 0.0045777
 	}
 }
 
-def getPowerMultiplier() {
-	if (state.powerMultiplier && state.powerDivisor) {
+def getPowerMultiplier() 
+{
+	if (state.powerMultiplier && state.powerDivisor) 
+    {
 		return (state.powerMultiplier / state.powerDivisor)
-	} else {
+	} 
+    else 
+    {
+        // typical value
 		return 0.277
 	}
 }
 
-def configure() {
-	log "in configure()"
-	return configureHealthCheck() + setRetainState()
+def configure() 
+{
+	//log "in Peanut Plug configure()"
+	setRetainState()
 }
 
-def configureHealthCheck() {
-	Integer hcIntervalMinutes = 12
-	sendEvent(name: "checkInterval", value: hcIntervalMinutes * 60, displayed: false, data: [protocol: "zigbee", hubHardwareId: device.hub.hardwareID])
-	return refresh()
-}
-
-def updated() {
+def updated()
+{
+    //log "in Peanut Plug updated()"
     log.info "${device.displayName}.updated()"
-	log "in updated()"
 	// updated() doesn't have it's return value processed as hub commands, so we have to send them explicitly
-	def cmds = configureHealthCheck() + setRetainState()
+	def cmds = setRetainState()
 	cmds.each{ sendHubCommand(new hubitat.device.HubAction(it)) }
 }
 
-def ping() {
+def ping() 
+{
 	return zigbee.onOffRefresh()
 }
 
-def setRetainState() {
+def setRetainState() 
+{
 	log "Setting Retain State: $RetainState"
-	if (RetainState == null || RetainState) {
-		if (RetainState == null) {
+	if (RetainState == null || RetainState) 
+    {
+		if (RetainState == null) 
+        {
 			log.warn "RetainState is null, defaulting to 'true' behavior"
 		}
 		return zigbee.writeAttribute(0x0003, 0x0000, DataType.UINT16, 0x0000)
-	} else {
+	} 
+    else 
+    {
 		return zigbee.writeAttribute(0x0003, 0x0000, DataType.UINT16, 0x1111)
 	}
 }
 
-def reset() {
-	log "Reset"
+def reset() 
+{
+	log "in Peanut Plug reset()"
+    
+    state.voltageMultiplier = 0.0
+    state.voltageDivisor = 0.0
+    state.voltage = 0.0
+    
+    state.currentMultiplier = 0.0
+    state.currentDivisor = 0.0
+    state.current = 0.0
+        
+    state.powerMultiplier = 0.0
+    state.powerDivisor = 0.0
+    state.powerValue = 0.0
 	state.energyValue = 0.0
-	state.powerValue = 0.0
-	state.voltage = 0.0
-	state.current = 0.0
+
 	state.time = now()
-	sendEvent(name: "energy", value: state.energyValue)
+    
+    sendEvent(name: "voltage", value: 0.0)
+    sendEvent(name: "current", value: 0.0)
+    sendEvent(name: "power", value: 0.0)
+	sendEvent(name: "energy", value: 0.0)
 }
