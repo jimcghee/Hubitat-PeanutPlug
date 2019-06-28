@@ -103,7 +103,7 @@ metadata
                 name: "ReportableCurrentChange",
                 type: "number",
                 title: "Minimum Current Change Report Value",
-                description: "Report Power change greater than XXX amps. (0 - 1000)",
+                description: "Report Current change greater than XXX amps. (0 - 1000)",
                 submitOnChange: true,
                 required: true,
                 range: "0..1000",
@@ -125,7 +125,7 @@ metadata
                 name: "ReportableVoltageChange",
                 type: "number",
                 title: "Minimum Voltage Change Report Value",
-                description: "Report Power change greater than XXX volts. (0 - 1000)",
+                description: "Report Voltage change greater than XXX volts. (0 - 1000)",
                 submitOnChange: true,
                 required: true,
                 range: "0..1000",
@@ -175,6 +175,9 @@ def parse(String description)
             /*
             http://www.zigbee.org/wp-content/uploads/2014/10/07-5123-06-zigbee-cluster-library-specification.pdf
 
+            Identifier Name            Type  Range                   Access Default    M/O
+            0x0000     MeasurementType map32 0x00000000 – 0xFFFFFFFF R      0x00000000 M
+
             Id     Name             Type     Range         Acc   Default M/O
             0x0505 RMSVoltage       uint16 0x0000 – 0xFFFF R     0xFFFF O
             0x0506 RMSVoltageMin    uint16 0x0000 – 0xFFFF R     0xFFFF O
@@ -195,6 +198,9 @@ def parse(String description)
                                           
             switch(descMap.attrInt)
             {
+                case 0x0000:
+                    log "MeasurementType: ${intVal}"
+                    break
                 case 0x0600:
                     log.info "ACVoltageMultiplier $intVal"
 				    state.voltageMultiplier = intVal
@@ -220,7 +226,7 @@ def parse(String description)
 				    state.powerDivisor = intVal
                     break
                 case 0x0505:
-                    def voltageValue = intVal * getVoltageMultiplier()
+                    def voltageValue = ((intVal as Double) * getVoltageMultiplier()).round(4)
                     log "Raw Voltage: ${intVal}"
                     log "Voltage Multiplier: ${getVoltageMultiplier()}"
                     log "RMS Voltage: ${voltageValue}"
@@ -228,7 +234,7 @@ def parse(String description)
 				    sendEvent(name: "voltage", value: voltageValue)
                     break
                 case 0x0508:
-                    def currentValue = intVal * getCurrentMultiplier()
+                    def currentValue = ((intVal as Double) * getCurrentMultiplier()).round(4)
                     log "Raw Current: ${intVal}"
                     log "Current Multiplier: ${getCurrentMultiplier()}"
                     log "RMS Current: ${currentValue}"
@@ -237,7 +243,7 @@ def parse(String description)
                     break
                 case 0x050B:
                     // first, calculate and update power
-                    def powerValue = intVal * getPowerMultiplier()
+                    def powerValue = ((intVal as Double) * getPowerMultiplier()).round(4)
                     log "Raw Power: ${intVal}"
                     log "Power Multiplier: ${getPowerMultiplier()}"
                     log "Power: ${powerValue}"				    
@@ -245,7 +251,7 @@ def parse(String description)
                     // then, calculate and update energy (in W*h)
                     def newTime = now()
                     // note that time is Unix epoch in msec, so this converts the difference to seconds and then hours
-                    def energyValue = state.energyValue + (newTime - state.time) * state.powerValue / (1000*3600)
+                    def energyValue = (state.energyValue + ((newTime as Double) - (state.time as Double)) * state.powerValue / (1000*3600)).round(4)
                     log "Energy: ${energyValue} W*h"
                     sendEvent(name: "energy", value: energyValue)
                 
@@ -306,7 +312,7 @@ def refresh()
 	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0602) +
 	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0603) +
 	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0604) +
-	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0605)
+	zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0605)  
 }
 
 def voltageMeasurementConfig()
@@ -452,4 +458,7 @@ def reset()
     sendEvent(name: "current", value: 0.0)
     sendEvent(name: "power", value: 0.0)
 	sendEvent(name: "energy", value: 0.0)
+    
+    // sanity check MeasurementType, for debugging only
+    zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0000)  
 }
