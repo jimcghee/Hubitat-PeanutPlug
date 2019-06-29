@@ -38,7 +38,6 @@ metadata
     {
 		capability "Configuration"
         capability "Energy Meter"
-        capability "Polling"
         capability "Power Meter"
         capability "Refresh"
 		capability "Switch"		
@@ -81,7 +80,7 @@ metadata
                 name: "ReportablePowerChange",
                 type: "number",
                 title: "Minimum Power Change Report Value",
-                description: "Report Power change greater than XXX watts. (0 - 1000)",
+                description: "Minimum power change to report.  Set this value to desired setting in watts divided by 0.277.",
                 submitOnChange: true,
                 required: true,
                 range: "0..1000",
@@ -103,7 +102,7 @@ metadata
                 name: "ReportableCurrentChange",
                 type: "number",
                 title: "Minimum Current Change Report Value",
-                description: "Report Current change greater than XXX amps. (0 - 1000)",
+                description: "Minimum current change to report.  Set this value to desired setting in amps divided by .00183.",
                 submitOnChange: true,
                 required: true,
                 range: "0..1000",
@@ -125,7 +124,7 @@ metadata
                 name: "ReportableVoltageChange",
                 type: "number",
                 title: "Minimum Voltage Change Report Value",
-                description: "Report Voltage change greater than XXX volts. (0 - 1000)",
+                description: "Minimum voltage change to report.  Set this value to desired setting in volts divided by .0046.",
                 submitOnChange: true,
                 required: true,
                 range: "0..1000",
@@ -323,7 +322,7 @@ def voltageMeasurementConfig()
                             DataType.UINT16, 
                             MinVoltageReportTime as Integer,    // Min Voltage reporting time in seconds
                             7200,                               // Max Voltage reporting time in seconds
-                            ReportableVoltageChange as Integer) // Min change to report.  Units unknown.
+                            ReportableVoltageChange as Integer) // Min change to report in raw units of device (approx .00458 volts per step)
 }
 
 def voltageMeasurementRefresh()
@@ -339,7 +338,7 @@ def currentMeasurementConfig()
                             DataType.UINT16, 
                             MinCurrentReportTime as Integer,    // Min Current reporting time in seconds
                             7200,                               // Max Current reporting time in seconds
-                            ReportableCurrentChange as Integer) // Min change to report.  Units unknown.
+                            ReportableCurrentChange as Integer) // Min change to report in raw units of device (approx .00183 amps per step)
 }
 
 def currentMeasurementRefresh()
@@ -353,9 +352,9 @@ def electricMeasurementPowerConfig()
 	zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 
                             0x050B, 
                             DataType.INT16, 
-                            MinPowerReportTime as Integer,              // Min Power reporting time in seconds
-                            7200,                                       // Max Power reporting time in seconds
-                            ReportablePowerChange as Integer)           // Min change to report.  Units unknown.
+                            MinPowerReportTime as Integer,       // Min Power reporting time in seconds
+                            7200,                                // Max Power reporting time in seconds
+                            ReportablePowerChange as Integer)    // Min change to report in raw units of device (approx .277 watts per step)
 }
 
 
@@ -439,6 +438,8 @@ def reset()
 {
 	log "in Peanut Plug reset()"
     
+    state.clear()
+    
     state.voltageMultiplier = 0.0
     state.voltageDivisor = 0.0
     state.voltage = 0.0
@@ -450,7 +451,7 @@ def reset()
     state.powerMultiplier = 0.0
     state.powerDivisor = 0.0
     state.powerValue = 0.0
-	state.energyValue = 0.0
+    state.energyValue = 0.0
 
 	state.time = now()
     
@@ -460,5 +461,9 @@ def reset()
 	sendEvent(name: "energy", value: 0.0)
     
     // sanity check MeasurementType, for debugging only
-    zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0000)  
+    zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x0000)
+    
+    // mirror steps in installed()
+    configure()
+    refresh()
 }
